@@ -1,0 +1,37 @@
+async (page) => {
+  const context = await page.context().browser().newContext({ acceptDownloads: true });
+  await context.addInitScript(() => Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true }));
+  const sender = await context.newPage(), receiver = await context.newPage();
+  const errors = [];
+  for (const tab of [sender,receiver]) tab.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({width:1280,height:900});
+  await page.screenshot({path:'D:/Projects/FriendDrop/preview-desktop.png',fullPage:true});
+  await sender.goto('http://127.0.0.1:8787');
+  await sender.locator('#file').setInputFiles('D:/Projects/FriendDrop/fixtures/中文测试.bin');
+  await sender.locator('#invite-panel').waitFor({state:'visible'});
+  const invite = await sender.locator('#invite').inputValue();
+  await receiver.goto(invite); await receiver.getByRole('button',{name:'连接朋友',exact:true}).click();
+  await receiver.locator('#accept-panel').waitFor({state:'visible',timeout:30000});
+  const leftCode = await sender.locator('#verify').textContent();
+  await receiver.locator('#verify').waitFor({state:'visible'});
+  const rightCode = await receiver.locator('#verify').textContent();
+  if (leftCode !== rightCode) throw new Error('Fingerprint codes differ');
+  await receiver.locator('#accept').click();
+  await receiver.locator('#download-panel').waitFor({state:'visible',timeout:60000});
+  await sender.getByRole('status').filter({hasText:'朋友已收到'}).waitFor({timeout:10000});
+  const downloading = receiver.waitForEvent('download'); await receiver.locator('#download').click();
+  const download = await downloading; await download.saveAs('D:/Projects/FriendDrop/received-smoke.bin');
+  await receiver.screenshot({path:'D:/Projects/FriendDrop/preview-received.png',fullPage:true});
+  const route = await sender.locator('#route').textContent();
+  await receiver.locator('#clear').click();
+  await receiver.getByRole('status').filter({hasText:'临时文件已清理'}).waitFor();
+  const entries = await receiver.evaluate(async () => { const root = await navigator.storage.getDirectory(); const d = await root.getDirectoryHandle('frienddrop'); return Array.fromAsync(d.keys()); });
+  if(entries.length) throw new Error('Temporary file not cleaned');
+  await context.close();
+  await page.setViewportSize({width:390,height:844});
+  if(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Mobile layout overflows');
+  await page.screenshot({path:'D:/Projects/FriendDrop/preview-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:900});
+  if(errors.length) throw new Error(errors.join(';'));
+  return {transferred:true,hashFile:'D:/Projects/FriendDrop/received-smoke.bin',route,matchingConfirmationCodes:true,temporaryFiles:entries.length,pageErrors:errors};
+}
