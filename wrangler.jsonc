@@ -9,7 +9,7 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
   "ratelimits": [{ "name": "REQUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }],
   "vars": {
-    "ALLOWED_ORIGINS": "http://localhost:8787,http://127.0.0.1:8787",
+    "ALLOWED_ORIGINS": "https://shuaigaodada.github.io,http://localhost:8787,http://127.0.0.1:8787",
     "STUN_URL": "stun:stun.cloudflare.com:3478"
   },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
