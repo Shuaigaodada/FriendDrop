@@ -1,6 +1,14 @@
 # 发布到 GitHub Pages + Cloudflare
 
-本文件是准备好的发布步骤；未执行创建远端、推送、上线或启用付费。先验收预览并确认发布，再执行。`server/local.mjs` 只服务本机预览，不能拿它当成已上线的信令。
+页面和 Worker 已于 2026-11-04 上线，证据见 public-validation.md。以下是后续部署说明。`server/local.mjs` 只服务本机预览。
+
+## 中继发放上限
+
+用户选择保留 TURN，接受保守保护不能保证零费用。TURN_MONTHLY_ROOM_LIMIT=40：每个 UTC 自然月最多 40 个邀请获得中继凭证资格，发送和接收端共用一次名额；用完后新邀请只获 STUN，继续尝试 P2P。每月自然恢复。配置为 0 可停止新凭证发放；缺失、非整数或大于 40 均按停用处理。名额在独立 SQLite Durable Object 中持久化，不随 Worker 重启/部署清零；同一个月同一房间重复申请不重复计数。检查异常、签发失败均不退还名额，防止故障时超发。
+
+这限制的是邀请数，不是 Cloudflare 实际账单流量。即使最后成功直连、未传文件或取消也会占名额。按每邀请预留 12 GB 粗估为 480 GB，但这不是流量硬上限：已签发凭证最长有效 5 小时、可能被复用，其他项目共享免费额度、月末跨界、协议开销和已有凭证也不能靠此计数覆盖。部署前已经签发的邀请不在新计数中。已开始的传输不会因额度耗尽被强制打断。不要删除 TURN_BUDGET 的持久数据来重置额度。
+
+Cloudflare Spend Policies API 当前产品枚举仅 workers/durable_objects，未提供 TURN 的零费用硬停。未配置自动扣费禁止或声称已配置。参考：https://developers.cloudflare.com/api/resources/billing/subresources/spend_policies/methods/create/
 
 ## Cloudflare 信令
 

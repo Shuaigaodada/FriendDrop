@@ -1,0 +1,8 @@
+{
+  "name": "frienddrop-budget-test",
+  "main": "budget.worker.ts",
+  "compatibility_date": "2026-10-30",
+  "durable_objects": { "bindings": [{ "name": "TURN_BUDGET", "class_name": "TurnBudget" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TurnBudget"] }],
+  "vars": { "TURN_MONTHLY_ROOM_LIMIT": "2" }
+}

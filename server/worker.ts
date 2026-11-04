@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { validSignal } from '../public/signaling.js';
+import { reserveTurnRoom } from './turn-budget.js';
 
 type RuntimeEnv = Env & { TURN_KEY_ID?: string; TURN_API_TOKEN?: string };
 type Seat = { role?: 'host' | 'guest'; ready?: boolean; count: number; since: number };
@@ -73,6 +74,7 @@ export class Room extends DurableObject<RuntimeEnv> {
     const iceServers: RTCIceServer[] = [{ urls: this.env.STUN_URL }];
     if (this.env.TURN_KEY_ID && this.env.TURN_API_TOKEN) {
       try {
+        if (!await this.env.TURN_BUDGET.getByName('monthly').reserve(this.ctx.id.toString())) return { iceServers, relay: false };
         const response = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(this.env.TURN_KEY_ID)}/credentials/generate-ice-servers`, {
           method: 'POST', headers: { Authorization: `Bearer ${this.env.TURN_API_TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ ttl: 18000 }), signal: AbortSignal.timeout(8000),
@@ -140,6 +142,12 @@ export class Room extends DurableObject<RuntimeEnv> {
     await this.ctx.storage.deleteAlarm();
   }
   async alarm() { await this.close('邀请或会话已到期，请重新创建'); }
+}
+
+export class TurnBudget extends DurableObject<RuntimeEnv> {
+  reserve(room: string) {
+    return reserveTurnRoom(this.ctx.storage.sql, room, this.env.TURN_MONTHLY_ROOM_LIMIT);
+  }
 }
 
 type RTCIceServer = { urls: string | string[]; username?: string; credential?: string };

@@ -1,6 +1,13 @@
 async (page) => {
   const context = page.context();
+  const target = new URL(page.url()); target.search = '';
   await context.addInitScript(() => Object.defineProperty(window, 'showSaveFilePicker', {value:undefined,configurable:true}));
+  await context.addInitScript(() => {
+    const Native = window.RTCPeerConnection;
+    window.RTCPeerConnection = class extends Native {
+      constructor(config) { super({...config, iceServers: config.iceServers.filter(s => [s.urls].flat().every(u => u.startsWith('stun:')))}); }
+    };
+  });
   const sender = await context.newPage(), receiver = await context.newPage();
   const errors=[]; for(const tab of [sender,receiver]) tab.on('pageerror', e=>errors.push(e.message));
   const sessions = await Promise.all([context.newCDPSession(sender),context.newCDPSession(receiver)]);
@@ -12,7 +19,7 @@ async (page) => {
     }catch{}
   },1000);
   try {
-    await sender.goto('http://127.0.0.1:8787');
+    await sender.goto(target.href);
     await sender.locator('#file').setInputFiles('D:/Projects/FriendDrop/fixtures/three-gb.bin');
     await sender.locator('#invite-panel').waitFor({state:'visible'});
     await receiver.goto(await sender.locator('#invite').inputValue());
@@ -29,6 +36,8 @@ async (page) => {
     await receiver.screenshot({path:'D:/Projects/FriendDrop/preview-three-gb.png',fullPage:true});
     await receiver.locator('#clear').click(); await receiver.getByRole('status').filter({hasText:'临时文件已清理'}).waitFor();
     if(errors.length)throw new Error(errors.join(';'));
-    return {size:3000000000,seconds,MBps:3000/seconds,heapPeaks:peaks,samples,errors};
+    const route = await sender.locator('#route').textContent();
+    if (!route.includes('P2P')) throw new Error(`Expected direct route: ${route}`);
+    return {size:3000000000,seconds,MBps:3000/seconds,route,heapPeaks:peaks,samples,errors};
   } finally { clearInterval(timer); await sender.close(); await receiver.close(); }
 }
