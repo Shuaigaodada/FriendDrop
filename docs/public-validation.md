@@ -15,11 +15,11 @@
 
 Playwright 在 GitHub Pages 上实际传输 8,388,645 字节，路线显示 P2P 直连；双端确认码相同、OPFS 清理成功、页面错误为零、下载后 SHA-256 与源文件一致：`331aca13269b9f539ba59cc816e10f0d3be12ef5f9b7b5a37e5a804b5b1c80e6`。两个浏览器页面在同一台电脑，此结果不代表中美网络实测。
 
-## TURN 待配置
+## TURN 配置与实测完成
 
-Wrangler 登录已刷新，部署成功；该 OAuth 的 TURN keys API 返回 HTTP 403，未创建 TURN key、未配置 Worker secrets。已请用户在 Cloudflare Realtime TURN 控制台创建 FriendDrop key，不能将密钥写进聊天、仓库或日志。尚未通过强制 relay 测试，不应宣称中继已就绪。
+Wrangler OAuth 的 TURN keys API 返回 HTTP 403，因此用户在 Cloudflare Realtime TURN 控制台创建 FriendDrop key，通过本机隐藏输入窗口提交 TURN_KEY_ID 和 TURN_API_TOKEN 到 Worker secrets。密钥仅经进程内存和 stdin 提交，未写进网页、聊天、仓库或本地明文文件。
 
-测试脚本已支持目标页面 URL 和 `?relay-test=1` 强制中继；服务测试用 FRIENDDROP_TEST_RELAY=true 检查已发放 TURN 配置。配置后仍须真实传输并核对 route 与文件哈希。
+配置后，线上服务测试 FRIENDDROP_TEST_RELAY=true 通过 2/2。Playwright 在 GitHub Pages 上用 `?relay-test=1` 运行测试脚本，两个客户端均覆盖 iceTransportPolicy 为 relay，真实传输 8,388,645 字节。路线显示「已连接 · 加密中继」，双端确认码相同、临时文件清理成功、页面错误为零。下载文件与源文件 SHA-256 均为 `331aca13269b9f539ba59cc816e10f0d3be12ef5f9b7b5a37e5a804b5b1c80e6`。普通网页仍优先直连，查询参数只供测试脚本识别，不改变生产网页策略。此测试是同一电脑经公网 TURN 中继，不代表中美线路实测。
 
 官方费用核对：Realtime SFU/TURN 共享每月 1,000 GB 免费出站额度，超额 $0.05/GB；不是费用硬上限。未主动升级或绑卡。跨国线路、手机 3 GB、线上 3 GB 尚未验证。本机 3 GB 的历史验证见 validation.md。
 
