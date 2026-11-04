@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
-const base = 'http://127.0.0.1:8787', Origin = base;
+const base = process.env.FRIENDDROP_TEST_API || 'http://127.0.0.1:8787';
+const Origin = process.env.FRIENDDROP_TEST_ORIGIN || base;
 async function room() { const r = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { Origin } }); assert.equal(r.status, 200); return r.json(); }
 function client(id) {
-  const ws = new WebSocket(`ws://127.0.0.1:8787/api/rooms/${id}/socket`, { headers: { Origin } });
+  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/api/rooms/${id}/socket`, { headers: { Origin } });
   const messages = [], waiters = [];
   ws.on('message', data => { const value = JSON.parse(data); const index = waiters.findIndex(w => w.type === value.type); if (index >= 0) waiters.splice(index,1)[0].resolve(value); else messages.push(value); });
   ws.on('error', () => {});
@@ -24,7 +25,7 @@ test('rejects cross-origin creation and unknown routes', async () => {
 });
 test('auth, pair, third-seat refusal, signaling, and disconnect invalidation', {timeout:15000}, async t => {
   const r = await room(); const host = client(r.id); await host.opened; t.after(() => host.ws.terminate());
-  host.send({ type:'auth', role:'host', token:r.host }); assert.equal((await host.get('authenticated')).relay,false);
+  host.send({ type:'auth', role:'host', token:r.host }); assert.equal((await host.get('authenticated')).relay,process.env.FRIENDDROP_TEST_RELAY === 'true');
   const bad = client(r.id); await bad.opened; t.after(() => bad.ws.terminate());
   bad.send({type:'auth',role:'guest',token:r.host}); await bad.get('error');
   const guest = client(r.id); await guest.opened; t.after(() => guest.ws.terminate());

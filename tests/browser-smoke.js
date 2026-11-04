@@ -1,12 +1,21 @@
 async (page) => {
+  const target = new URL(page.url());
+  const forceRelay = target.searchParams.has('relay-test');
+  target.search = '';
   const context = await page.context().browser().newContext({ acceptDownloads: true });
+  if (forceRelay) await context.addInitScript(() => {
+    const Native = window.RTCPeerConnection;
+    window.RTCPeerConnection = class extends Native {
+      constructor(config) { super({ ...config, iceTransportPolicy: 'relay' }); }
+    };
+  });
   await context.addInitScript(() => Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true }));
   const sender = await context.newPage(), receiver = await context.newPage();
   const errors = [];
   for (const tab of [sender,receiver]) tab.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({width:1280,height:900});
   await page.screenshot({path:'D:/Projects/FriendDrop/preview-desktop.png',fullPage:true});
-  await sender.goto('http://127.0.0.1:8787');
+  await sender.goto(target.href);
   await sender.locator('#file').setInputFiles('D:/Projects/FriendDrop/fixtures/中文测试.bin');
   await sender.locator('#invite-panel').waitFor({state:'visible'});
   const invite = await sender.locator('#invite').inputValue();
@@ -23,6 +32,7 @@ async (page) => {
   const download = await downloading; await download.saveAs('D:/Projects/FriendDrop/received-smoke.bin');
   await receiver.screenshot({path:'D:/Projects/FriendDrop/preview-received.png',fullPage:true});
   const route = await sender.locator('#route').textContent();
+  if (forceRelay && !route.includes('中继')) throw new Error(`Expected relay, got ${route}`);
   await receiver.locator('#clear').click();
   await receiver.getByRole('status').filter({hasText:'临时文件已清理'}).waitFor();
   const entries = await receiver.evaluate(async () => { const root = await navigator.storage.getDirectory(); const d = await root.getDirectoryHandle('frienddrop'); return Array.fromAsync(d.keys()); });
